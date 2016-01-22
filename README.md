@@ -3,7 +3,7 @@
 ## Why?
 
 GPG can be complicated: this gem is just a high level wrapper around `gpg`.
-GPGME als provides a nice API on top of GPG, but it has two drawbacks: it is
+GPGME also provides a nice API on top of GPG, but it has two drawbacks: it is
 not thread safe and it holds the GIL when shelling out to `gpg`. This holds up
 the entire ruby process for the duration of the GPG call, which can be
 relatively slow.
