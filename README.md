@@ -79,36 +79,43 @@ end
 ### GPG setup (this was done to setup the tests, here for posterity)
 
 Generate key for Rick Hardslab
+
 ```
 gpg --homedir spec/support/rickhardslab --gen-key
 ```
 
 Generate key for Spaceman Spiff
+
 ```
 gpg --homedir spec/support/spacemanspiff --gen-key
 ```
 
 Rick Hardslab imports Spaceman Spiff's public key
+
 ```
 gpg --homedir rickhardslab --import spacemanspiff/pubring.gpg
 ```
 
 Rick Hardslab trusts Spaceman Spiff's public key
+
 ```
 gpg --homedir spec/support/spacemanspiff --export-ownertrust | gpg --homedir spec/support/rickhardslab --import-ownertrust
 ```
 
 Spaceman Spiff imports Rick Hardslab's public key
+
 ```
 gpg --homedir spacemanspiff --import rickhardslab/pubring.gpg
 ```
 
 Spaceman Spiff trusts Rick Hardslab's public key
+
 ```
 gpg --homedir spec/support/rickhardslab --export-ownertrust | gpg --homedir spec/support/spacemanspiff --import-ownertrust
 ```
 
 Rick Hardslab's keys
+
 ```
 % gpg --homedir rickhardslab -k
 rickhardslab/pubring.gpg
@@ -130,6 +137,7 @@ ssb   2048R/7FCAE6B3 2016-01-18
 ```
 
 Spaceman Spiff's keys
+
 ```
 % gpg --homedir spacemanspiff -K
 spacemanspiff/secring.gpg
