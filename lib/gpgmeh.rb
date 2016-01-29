@@ -40,6 +40,9 @@ class GPGMeh
   def self.encrypt(plaintext, recipients, gpg_options: {}, sign: true, passphrase_callback: nil, &block)
     raise ArgumentError, "passphrase callback required to sign" if sign && (passphrase_callback || block).nil?
     raise ArgumentError, "recipient(s) required" if recipients.empty?
+    unless recipients.all? { |key_id| /^[A-Za-z0-9]+$/ =~ key_id }
+      raise ArgumentError, "recipient key ids must all be alphanumeric strings"
+    end
     new(gpg_options).encrypt(plaintext, recipients, sign: sign, passphrase_callback: passphrase_callback || block)
   end
 
@@ -108,7 +111,7 @@ class GPGMeh
     attr_writer :logger
   end
   self.default_cmd = "gpg".freeze
-  self.default_args = %w(--armor).freeze
+  self.default_args = %w(--armor --trust-model always).freeze
   self.passphrase_timeout_sec = 0.2
 
   def self.logger
