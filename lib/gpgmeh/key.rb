@@ -22,7 +22,7 @@ class GPGMeh
       "rvk" => "revocation key",
       "tru" => "trust database information",
       "spk" => "signature subpacket",
-    }.each { |k, v| k.freeze; v.freeze }.freeze
+    }.each { |k, v| k.freeze; v.freeze }.freeze # rubocop:disable Style/Semicolon
 
     TRUSTS = {
       "o" => "other",
@@ -34,7 +34,7 @@ class GPGMeh
       "m" => "marginal",
       "f" => "fully",
       "u" => "ultimately",
-    }.each { |k, v| k.freeze; v.freeze }.tap do |t|
+    }.each { |k, v| k.freeze; v.freeze }.tap do |t| # rubocop:disable Style/Semicolon
       t["-".freeze] = "unknown".freeze
       t["q".freeze] = t["-"]
     end.freeze
@@ -45,7 +45,7 @@ class GPGMeh
       "c" => "certify",
       "a" => "authentication",
       "d" => "disabled",
-    }.each { |k, v| k.freeze; v.freeze }.freeze
+    }.each { |k, v| k.freeze; v.freeze }.freeze # rubocop:disable Style/Semicolon
 
     def self.parse(raw_keys)
       raw_keys.split("\n").map do |raw_key|

@@ -49,14 +49,11 @@ RSpec.describe GPGMeh do
       ) { |_| "secret" }
       expect(plaintext).to eq("boom")
     end
-
   end
 
   describe "errors" do
     it "raises NoPassphraseError if the callback does not return a string" do
-      expect {
-        GPGMeh.encrypt_symmetric("boom") { |_| nil }
-      }.to raise_error(GPGMeh::NoPassphraseError)
+      expect { GPGMeh.encrypt_symmetric("boom") { |_| nil } }.to raise_error(GPGMeh::NoPassphraseError)
     end
 
     it "raises PassphraseTimeoutError if it takes too long to send the passphrase" do

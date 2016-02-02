@@ -68,7 +68,8 @@ class GPGMeh
   # @param sign (@see #GPGMeh.encrypt)
   # @param passphrase_callback [callable] or [block] callable that returns passphrases:
   #   `callable.call(:symmetric)` # => the symmetric passphrase (required)
-  #   `callable.call(<short format secret key id>)` # => the secret keyring passphrase (optional, only used when signing)
+  #   `callable.call(<short format secret key id>)` # => the secret keyring passphrase
+  #     (optional, only used when signing)
   #
   # Example:
   #
@@ -246,9 +247,7 @@ class GPGMeh
   # @private
   def encrypt(plaintext, recipients, sign:, passphrase_callback:)
     extra_args = %w(--encrypt) + recipients.flat_map { |recipient| ["--recipient", recipient] }
-    if sign
-      extra_args << "--sign"
-    end
+    extra_args << "--sign" if sign
     start_subprocess(extra_args, plaintext, passphrase_callback)
   end
 
