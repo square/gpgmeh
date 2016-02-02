@@ -125,4 +125,23 @@ RSpec.describe GPGMeh do
       expect(keys[1].creation_date).to eq(Date.new(2016, 1, 18))
     end
   end
+
+  describe "#read_nonblock" do
+    it "never reads and times out" do
+      gpg = GPGMeh.send(:new)
+      r, _w = IO.pipe
+      expect { gpg.send(:read_nonblock, r) }.to raise_error(GPGMeh::TimeoutError)
+    end
+
+    it "reads partial output and times out" do
+      gpg = GPGMeh.send(:new)
+      r, w = IO.pipe
+      w << "partial"
+      expect do
+        gpg.send(:read_nonblock, r) do |partial|
+          expect(partial).to eq("partial")
+        end
+      end.to raise_error(GPGMeh::TimeoutError)
+    end
+  end
 end

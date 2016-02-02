@@ -6,12 +6,12 @@ RSpec.describe "GPGMeh stress test:" do
   ITERS = 50
 
   around do |example|
-    tmp = GPGMeh.passphrase_timeout_sec
-    GPGMeh.passphrase_timeout_sec = 10
+    tmp = GPGMeh.timeout_sec
+    GPGMeh.timeout_sec = 10
 
     time = Benchmark.realtime { example.call }
 
-    GPGMeh.passphrase_timeout_sec = tmp
+    GPGMeh.timeout_sec = tmp
 
     description = example.metadata[:description]
     description.replace(description % [time * 1_000 / THREADS / ITERS, THREADS, ITERS])
