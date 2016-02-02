@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+set -ex
+
+echo "Installing bundler if needed..."
+gem install bundler --conservative --version '>= 1.11.2'
+
+echo "Installing gems..."
+bundle check || bundle install
+
+echo "Running specs"
+case "$TEST_RUNNER" in
+  spec)
+    time bundle exec rspec
+    ;;
+  rubocop)
+    RUN_LIST=$(echo $RUN_LIST | tr "," " ")
+    time bundle exec rubocop -D --force-exclusion $RUN_LIST
+    ;;
+  *)
+    echo "Unknown TEST_RUNNER: $TEST_RUNNER" && exit 1
+    ;;
+esac
