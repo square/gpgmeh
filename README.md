@@ -31,7 +31,7 @@ Or install it yourself as:
 ```ruby
 GPGMeh.default_cmd = "gpg" # first gpg found in your $PATH
 GPGMeh.default_args = ["--armor", "--trust-model", "always"]` # --no-tty` and `--quiet` are always added to the argument list
-GPGMeh.passphrase_timeout_sec = 0.2 # wait up to 200ms for all passphrases to get sent
+GPGMeh.timeout_sec = 0.2 # wait up to 200ms for gpg to finish
 ```
 
 ### Public Key Encryption: Rick wants to encrypt and sign something for Spiff

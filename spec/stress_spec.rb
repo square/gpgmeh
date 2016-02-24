@@ -6,19 +6,19 @@ RSpec.describe "GPGMeh stress test:" do
   ITERS = 50
 
   around do |example|
-    tmp = GPGMeh.passphrase_timeout_sec
-    GPGMeh.passphrase_timeout_sec = 10
+    tmp = GPGMeh.timeout_sec
+    GPGMeh.timeout_sec = 10
 
     time = Benchmark.realtime { example.call }
 
-    GPGMeh.passphrase_timeout_sec = tmp
+    GPGMeh.timeout_sec = tmp
 
     description = example.metadata[:description]
-    description.replace(description % [time * 1_000 / THREADS / ITERS, THREADS, ITERS])
+    description.replace(format(description, time * 1_000 / THREADS / ITERS, THREADS, ITERS))
   end
 
   it "%.1f ms / roundtip encrypt, decrypt iteration (threads=%d, iters=%d)" do
-    threads = THREADS.times.map do
+    threads = Array.new(THREADS) do
       spiff = SUPPORT.join("spacemanspiff").to_s
       Thread.new do
         ITERS.times do

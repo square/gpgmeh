@@ -49,14 +49,11 @@ RSpec.describe GPGMeh do
       ) { |_| "secret" }
       expect(plaintext).to eq("boom")
     end
-
   end
 
   describe "errors" do
     it "raises NoPassphraseError if the callback does not return a string" do
-      expect {
-        GPGMeh.encrypt_symmetric("boom") { |_| nil }
-      }.to raise_error(GPGMeh::NoPassphraseError)
+      expect { GPGMeh.encrypt_symmetric("boom") { |_| nil } }.to raise_error(GPGMeh::NoPassphraseError)
     end
 
     it "raises PassphraseTimeoutError if it takes too long to send the passphrase" do
@@ -123,6 +120,25 @@ RSpec.describe GPGMeh do
       expect(keys[1].capabilities).to be_empty
       expect(keys[1].name).to be_empty
       expect(keys[1].creation_date).to eq(Date.new(2016, 1, 18))
+    end
+  end
+
+  describe "#read_nonblock" do
+    it "never reads and times out" do
+      gpg = GPGMeh.send(:new)
+      r, _w = IO.pipe
+      expect { gpg.send(:read_nonblock, r) }.to raise_error(GPGMeh::TimeoutError)
+    end
+
+    it "reads partial output and times out" do
+      gpg = GPGMeh.send(:new)
+      r, w = IO.pipe
+      w << "partial"
+      expect do
+        gpg.send(:read_nonblock, r) do |partial|
+          expect(partial).to eq("partial")
+        end
+      end.to raise_error(GPGMeh::TimeoutError)
     end
   end
 end

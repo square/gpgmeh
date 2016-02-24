@@ -1,10 +1,12 @@
+require "active_support/core_ext/object/blank"
 require "active_support/core_ext/object/try"
 require "logger"
 require "open3"
+require "io/wait"
 
 class GPGMeh
   class Error < StandardError; end
-  class PassphraseTimeoutError < Error; end
+  class TimeoutError < Error; end
   class NoPassphraseError < Error; end
 end
 
@@ -19,7 +21,8 @@ class GPGMeh
   # @param recipients [String] or [Array<String>] list of public key id's
   # @param gpg_options [Hash<Symbol, String>] gpg options, valid keys: cmd, args, homedir
   #   cmd: gpg command to execute, default=gpg
-  #   args: command line arguments for gpg, default=--armor (note: --no-tty and --quiet are always added)
+  #   args: command line arguments for gpg, default=%w(--armor --trust-model always)
+  #     (note: --no-tty and --quiet are always added)
   #   homedir: custom homedir for gpg (passes --homedir argument to gpg)
   # @param sign [bool] should the encrypted message be signed? Requires `passphrase_callback`. [default=true]
   # @param passphrase_callback [callable] or [block] callable that returns the secret keyring passphrase,
@@ -65,7 +68,8 @@ class GPGMeh
   # @param sign (@see #GPGMeh.encrypt)
   # @param passphrase_callback [callable] or [block] callable that returns passphrases:
   #   `callable.call(:symmetric)` # => the symmetric passphrase (required)
-  #   `callable.call(<short format secret key id>)` # => the secret keyring passphrase (optional, only used when signing)
+  #   `callable.call(<short format secret key id>)` # => the secret keyring passphrase
+  #     (optional, only used when signing)
   #
   # Example:
   #
@@ -107,12 +111,12 @@ class GPGMeh
   end
 
   class <<self
-    attr_accessor :default_cmd, :default_args, :default_homedir, :passphrase_timeout_sec
+    attr_accessor :default_cmd, :default_args, :default_homedir, :timeout_sec
     attr_writer :logger
   end
   self.default_cmd = "gpg".freeze
   self.default_args = %w(--armor --trust-model always).freeze
-  self.passphrase_timeout_sec = 0.2
+  self.timeout_sec = 0.2
 
   def self.logger
     @logger ||= Logger.new(STDOUT)
@@ -128,6 +132,7 @@ class GPGMeh
     @gpg_args.concat(["--homedir", homedir.dup]) if homedir
     @gpg_args << "--no-tty" unless @gpg_args.include?("--no-tty")
     @gpg_args << "--quiet" unless @gpg_args.include?("--quiet")
+    @deadline = Time.now + self.class.timeout_sec
   end
   private_class_method :new
 
@@ -169,62 +174,71 @@ class GPGMeh
         raise
       end
 
-      warning = stderr.read
-      self.class.logger.warn("GPGMeh: gpg stderr=#{warning.inspect}") unless warning.empty?
+      warning = read_nonblock(stderr)
+      if warning.present?
+        self.class.logger.warn("GPGMeh: gpg stderr=#{warning.inspect}")
+      end
+      # wait on thread completion until the deadline
+      raise TimeoutError if wait_thread.join(@deadline - Time.now).nil?
       if wait_thread.value.try(:success?)
-        stdout.read
+        read_nonblock(stdout)
       else
         raise Error, "gpg non-zero exit status=#{wait_thread.value}"
       end
     end
   end
 
-  def handle_gpg_fd_io(callback, timeout: self.class.passphrase_timeout_sec)
-    deadline = Time.now + timeout
+  def handle_gpg_fd_io(callback)
     buffer = ""
-    secring_sent = false
-    symmetric_sent = false
-    until symmetric_sent && secring_sent
-      raise PassphraseTimeoutError if Time.now > deadline
+    read_nonblock(status_r) do |status_chunk|
+      buffer += status_chunk
+      last = buffer.rindex("\n")
 
-      readables, _writeables, _errors = IO.select([status_r], nil, nil, deadline - Time.now)
-      next unless readables
-      readables.each do |readable|
-        output = begin
-                   readable.read_nonblock(8192, exception: false)
-                 rescue EOFError
-                   raise DecryptionError, "unexpected EOF sending passphrase"
-                 end
-        self.class.logger.debug("GPGMeh: output=#{output.inspect}") if ENV["GPG_DEBUG"]
-        next if output == :wait_readable || output.nil?
-
-        buffer += output
-        last = buffer.rindex("\n")
-
-        buffer[0..last].split("\n").each do |line|
-          if /NEED_PASSPHRASE (?<sub_key_id>\S+) (?<key_id>\S+)/ =~ line
-            if ENV["GPG_DEBUG"]
-              self.class.logger.debug("GPGMeh: sub_key_id=#{sub_key_id.inspect} key_id=#{key_id.inspect}")
-            end
-            passphrase = callback.call(sub_key_id[-8..-1])
-            raise NoPassphraseError, "secret keyring passphrase required from callback" unless passphrase
-            command_w.puts(passphrase)
-            secring_sent = true
-          elsif /NEED_PASSPHRASE_SYM/ =~ line
-            passphrase = callback.call(:symmetric)
-            raise NoPassphraseError, "symmetric passphrase required from callback" unless passphrase
-            command_w.puts(passphrase)
-            symmetric_sent = true
-          elsif /END_(DE|EN)CRYPTION/ =~ line
-            return
+      buffer[0..last].split("\n").each do |line|
+        if /NEED_PASSPHRASE (?<sub_key_id>\S+) (?<key_id>\S+)/ =~ line
+          if ENV["GPG_DEBUG"]
+            self.class.logger.debug("GPGMeh: sub_key_id=#{sub_key_id.inspect} key_id=#{key_id.inspect}")
           end
+          passphrase = callback.call(sub_key_id[-8..-1])
+          raise NoPassphraseError, "secret keyring passphrase required from callback" unless passphrase
+          command_w.puts(passphrase)
+        elsif /NEED_PASSPHRASE_SYM/ =~ line
+          passphrase = callback.call(:symmetric)
+          raise NoPassphraseError, "symmetric passphrase required from callback" unless passphrase
+          command_w.puts(passphrase)
         end
-        buffer = buffer[(last + 1)..-1]
       end
+      buffer = buffer[(last + 1)..-1]
     end
   ensure
     status_r.close
     command_w.close
+  end
+
+  # If a block is given, all partial reads of the io will be passed sequentially to the block.
+  # Returns everything read on the stream up until an EOF is read, or throws TimeoutError
+  # if there is no EOF before the deadline.
+  def read_nonblock(io)
+    output = ""
+    loop do
+      raise TimeoutError if Time.now >= @deadline
+
+      output_chunk = io.read_nonblock(8192, exception: false)
+      self.class.logger.debug("GPGMeh: output=#{output_chunk.inspect}") if ENV["GPG_DEBUG"]
+
+      return output if output_chunk.nil? # only returned for EOF error?
+
+      if output_chunk == :wait_readable
+        wait = @deadline - Time.now
+        raise TimeoutError if 0 >= wait
+        io.wait_readable(wait)
+        next
+      end
+
+      yield output_chunk if block_given?
+
+      output += output_chunk
+    end
   end
 
   # These methods are "public", but since `new` is private, they should be inaccessible
@@ -233,9 +247,7 @@ class GPGMeh
   # @private
   def encrypt(plaintext, recipients, sign:, passphrase_callback:)
     extra_args = %w(--encrypt) + recipients.flat_map { |recipient| ["--recipient", recipient] }
-    if sign
-      extra_args << "--sign"
-    end
+    extra_args << "--sign" if sign
     start_subprocess(extra_args, plaintext, passphrase_callback)
   end
 
