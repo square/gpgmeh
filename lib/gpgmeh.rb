@@ -46,7 +46,10 @@ class GPGMeh
     unless recipients.all? { |key_id| /^[A-Za-z0-9]+$/ =~ key_id }
       raise ArgumentError, "recipient key ids must all be alphanumeric strings"
     end
+    t = Time.now
     new(gpg_options).encrypt(plaintext, recipients, sign: sign, passphrase_callback: passphrase_callback || block)
+  ensure
+    logger.debug(format("GPGMeh: encryption time=%.3fs", Time.now - t)) if t
   end
 
   # Decrypt public key encrypted message using secret keyring
@@ -58,7 +61,10 @@ class GPGMeh
   # @return [String] encrypted message
   def self.decrypt(encrypted_blob, gpg_options: {}, passphrase_callback: nil, &block)
     raise ArgumentError, "passphrase callback required" if (passphrase_callback || block).nil?
+    t = Time.now
     new(gpg_options).decrypt(encrypted_blob, passphrase_callback || block)
+  ensure
+    logger.debug(format("GPGMeh: decryption time=%.3fs", Time.now - t)) if t
   end
 
   # Encrypt message using a symmetric passphrase
@@ -91,11 +97,14 @@ class GPGMeh
     passphrase_callback: nil,
     &block
   )
+    t = Time.now
     new(gpg_options).encrypt_symmetric(
       plaintext,
       sign: sign,
       passphrase_callback: passphrase_callback || block,
     )
+  ensure
+    logger.debug(format("GPGMeh: symmetric encryption time=%.3fs", Time.now - t)) if t
   end
 
   def self.public_keys(gpg_options: {})
@@ -196,13 +205,14 @@ class GPGMeh
 
       buffer[0..last].split("\n").each do |line|
         if /NEED_PASSPHRASE (?<sub_key_id>\S+) (?<key_id>\S+)/ =~ line
-          if ENV["GPG_DEBUG"]
-            self.class.logger.debug("GPGMeh: sub_key_id=#{sub_key_id.inspect} key_id=#{key_id.inspect}")
-          end
+          self.class.logger.debug(
+            "GPGMeh: NEED_PASSPHRASE sub_key_id=#{sub_key_id.inspect} key_id=#{key_id.inspect}",
+          )
           passphrase = callback.call(sub_key_id[-8..-1])
           raise NoPassphraseError, "secret keyring passphrase required from callback" unless passphrase
           command_w.puts(passphrase)
         elsif /NEED_PASSPHRASE_SYM/ =~ line
+          self.class.logger.debug("GPGMeh: NEED_PASSPHRASE_SYM")
           passphrase = callback.call(:symmetric)
           raise NoPassphraseError, "symmetric passphrase required from callback" unless passphrase
           command_w.puts(passphrase)
@@ -224,7 +234,6 @@ class GPGMeh
       raise TimeoutError if Time.now >= @deadline
 
       output_chunk = io.read_nonblock(8192, exception: false)
-      self.class.logger.debug("GPGMeh: output=#{output_chunk.inspect}") if ENV["GPG_DEBUG"]
 
       return output if output_chunk.nil? # only returned for EOF error?
 
