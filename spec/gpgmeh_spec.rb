@@ -27,6 +27,18 @@ RSpec.describe GPGMeh do
       plaintext_for_rick = GPGMeh.decrypt(encrypted_blob) { |_short_sub_key_id| "test" }
       expect(plaintext_for_rick).to eq("boom")
     end
+
+    it "works with > 64k blobs" do
+      blob = SecureRandom.hex(50_000) # 100k bytes
+      encrypted_blob = GPGMeh.encrypt(blob, %w(7CAAAB91), sign: false)
+
+      plaintext_for_spiff = GPGMeh.decrypt(
+        encrypted_blob,
+        gpg_options: {homedir: SUPPORT.join("spacemanspiff").to_s},
+      ) { |_short_sub_key_id| "test" }
+      expect(plaintext_for_spiff.size).to eq(blob.size)
+      expect(plaintext_for_spiff).to eq(blob)
+    end
   end
 
   describe "symmetric encryption (.encrypt_symmetric, .decrypt)" do
@@ -139,6 +151,39 @@ RSpec.describe GPGMeh do
           expect(partial).to eq("partial")
         end
       end.to raise_error(GPGMeh::TimeoutError)
+    end
+
+    it "works with > 64k bytes on multiple pipes" do
+      gpg = GPGMeh.send(:new)
+      r0, w0 = IO.pipe
+      r1, w1 = IO.pipe
+      r2, w2 = IO.pipe
+      buffer0 = "a" * 100_000 + "b" * 100_000
+      buffer1 = "c" * 100_000 + "d" * 100_000
+      buffer2 = "e" * 100_000
+      thread = Thread.new do
+        w2 << buffer2
+        w2.close
+        w0 << buffer0[0...100_000]
+        w1 << buffer1[0...100_000]
+        w0 << buffer0[100_000..-1]
+        w0.close
+        w1 << buffer1[100_000..-1]
+        w1.close
+      end
+
+      output = gpg.send(:read_nonblock, r1, r0, r2)
+      expect(output.size).to eq(buffer1.size)
+      expect(output).to eq(buffer1)
+
+      output = gpg.send(:read_nonblock, r0, r1, r2)
+      expect(output.size).to eq(buffer0.size)
+      expect(output).to eq(buffer0)
+
+      output = gpg.send(:read_nonblock, r2, r1, r0)
+      expect(output.size).to eq(buffer2.size)
+      expect(output).to eq(buffer2)
+      thread.join
     end
   end
 end

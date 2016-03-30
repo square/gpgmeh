@@ -2,7 +2,6 @@ require "active_support/core_ext/object/blank"
 require "active_support/core_ext/object/try"
 require "logger"
 require "open3"
-require "io/wait"
 
 class GPGMeh
   class Error < StandardError; end
@@ -142,12 +141,13 @@ class GPGMeh
     @gpg_args << "--no-tty" unless @gpg_args.include?("--no-tty")
     @gpg_args << "--quiet" unless @gpg_args.include?("--quiet")
     @deadline = Time.now + self.class.timeout_sec
+    @buffered_output = Hash.new { |h, fd| h[fd] = "" }
   end
   private_class_method :new
 
   private
 
-  attr_reader :gpg_cmd, :gpg_args, :status_r, :status_w, :command_r, :command_w
+  attr_reader :gpg_cmd, :gpg_args, :status_r, :status_w, :command_r, :command_w, :stdout, :stderr
 
   def start_subprocess(extra_args, input = nil, callback = nil)
     if callback
@@ -159,47 +159,51 @@ class GPGMeh
       extra_args.concat(["--status-fd", status_w.to_i.to_s, "--command-fd", command_r.to_i.to_s])
     end
 
-    Open3.popen3(gpg_cmd, *gpg_args, *extra_args, close_others: !callback) do |stdin, stdout, stderr, wait_thread|
-      stdout.set_encoding(Encoding::BINARY)
-      begin
-        if callback
-          command_r.close
-          status_w.close
-        end
+    stdin, @stdout, @stderr, wait_thread = Open3.popen3(gpg_cmd, *gpg_args, *extra_args, close_others: !callback)
+    stdout.set_encoding(Encoding::BINARY)
 
-        if input
-          stdin.write(input)
-          stdin.close
-        end
+    if callback
+      command_r.close
+      status_w.close
+    end
 
-        handle_gpg_fd_io(callback) if callback
-      rescue => e
-        self.class.logger.error("GPGMeh: error=#{e.inspect} backtrace=#{e.backtrace.inspect}")
-        begin
-          Process.kill(:SIGINT, wait_thread.pid)
-        rescue
-          nil
-        end
-        raise
-      end
+    stdin.write(input) if input
+    stdin.close
 
-      warning = read_nonblock(stderr)
-      if warning.present?
-        self.class.logger.warn("GPGMeh: gpg stderr=#{warning.inspect}")
-      end
-      # wait on thread completion until the deadline
-      raise TimeoutError if wait_thread.join(@deadline - Time.now).nil?
-      if wait_thread.value.try(:success?)
-        read_nonblock(stdout)
-      else
-        raise Error, "gpg non-zero exit status=#{wait_thread.value}"
-      end
+    handle_gpg_fd_io(callback) if callback
+
+    warning = read_nonblock(stderr, stdout)
+    if warning.present?
+      self.class.logger.warn("GPGMeh: gpg stderr=#{warning.inspect}")
+    end
+
+    # wait on thread completion until the deadline
+    wait = @deadline - Time.now
+    raise TimeoutError if 0 >= wait || wait_thread.join(wait).nil?
+
+    if wait_thread.value.try(:success?)
+      read_nonblock(stdout, stderr)
+    else
+      raise Error, "gpg non-zero exit status=#{wait_thread.value}"
+    end
+  rescue => e
+    self.class.logger.error("GPGMeh: error=#{e.inspect} backtrace=#{e.backtrace[0..20].inspect}")
+    raise
+  ensure
+    # rubocop:disable Style/RescueModifier
+    stdin.close rescue nil
+    stdout.close rescue nil
+    stderr.close rescue nil
+    # rubocop:enable Style/RescueModifier
+    begin
+      Process.kill(:SIGINT, wait_thread.pid) if wait_thread.alive?
+    rescue Errno::ESRCH # rubocop:disable Lint/HandleExceptions
     end
   end
 
   def handle_gpg_fd_io(callback)
     buffer = ""
-    read_nonblock(status_r) do |status_chunk|
+    read_nonblock(status_r, stdout, stderr) do |status_chunk|
       buffer += status_chunk
       last = buffer.rindex("\n")
 
@@ -228,25 +232,34 @@ class GPGMeh
   # If a block is given, all partial reads of the io will be passed sequentially to the block.
   # Returns everything read on the stream up until an EOF is read, or throws TimeoutError
   # if there is no EOF before the deadline.
-  def read_nonblock(io)
-    output = ""
+  def read_nonblock(io, *other_ios)
+    ios = other_ios << io
     loop do
-      raise TimeoutError if Time.now >= @deadline
+      wait = @deadline - Time.now
+      raise TimeoutError if 0 >= wait
 
-      output_chunk = io.read_nonblock(8192, exception: false)
+      ready = IO.select(ios, nil, nil, wait)
+      next unless ready
+      readables = ready[0]
+      next unless readables
 
-      return output if output_chunk.nil? # only returned for EOF error?
+      readables.each do |readable|
+        output_chunk = readable.read_nonblock(8192, exception: false)
+        next if output_chunk == :wait_readable
 
-      if output_chunk == :wait_readable
-        wait = @deadline - Time.now
-        raise TimeoutError if 0 >= wait
-        io.wait_readable(wait)
-        next
+        if readable == io
+          # output_chunk == nil means readable EOF
+          if output_chunk.nil?
+            return @buffered_output.delete(readable) || ""
+          elsif block_given?
+            yield output_chunk
+          end
+        elsif output_chunk.nil?
+          next
+        end
+
+        @buffered_output[readable] += output_chunk
       end
-
-      yield output_chunk if block_given?
-
-      output += output_chunk
     end
   end
 
