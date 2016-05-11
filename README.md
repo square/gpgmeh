@@ -122,6 +122,13 @@ Spaceman Spiff trusts Rick Hardslab's public key
 gpg --homedir spec/support/rickhardslab --export-ownertrust | gpg --homedir spec/support/spacemanspiff --import-ownertrust
 ```
 
+Edit Rick's Key so a "uid" record exists for the tests to ignore ;)
+
+```
+gpg --homedir spec/support/rickhardslab/ --edit-key 7A9910E0243D6FEB
+# Edit the fields and "save" to exit
+```
+
 Rick Hardslab's keys
 
 ```
@@ -129,6 +136,7 @@ Rick Hardslab's keys
 rickhardslab/pubring.gpg
 ------------------------
 pub   2048R/243D6FEB 2016-01-18
+uid                  Richard Hardslab (The Real Rick) <richard@example.com>
 uid                  Rick Hardslab <rick@example.com>
 sub   2048R/7FCAE6B3 2016-01-18
 
@@ -141,6 +149,7 @@ rickhardslab/secring.gpg
 ------------------------
 sec   2048R/243D6FEB 2016-01-18
 uid                  Rick Hardslab <rick@example.com>
+uid                  Richard Hardslab (The Real Rick) <richard@example.com>
 ssb   2048R/7FCAE6B3 2016-01-18
 ```
 

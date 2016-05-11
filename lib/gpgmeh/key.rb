@@ -24,6 +24,8 @@ class GPGMeh
       "spk" => "signature subpacket",
     }.each { |k, v| k.freeze; v.freeze }.freeze # rubocop:disable Style/Semicolon
 
+    TYPES_THAT_MATTER = TYPES.values_at(*%w(pub sub sec ssb rvk)).to_set.freeze
+
     TRUSTS = {
       "o" => "other",
       "i" => "invalid",
@@ -52,7 +54,7 @@ class GPGMeh
         fields = raw_key.split(":", 13)
         key = new
         key.type = fields[0]
-        next if key.type == "trust database information"
+        next unless TYPES_THAT_MATTER.include?(key.type)
         key.trust = fields[1]
         key.key_length = fields[2].to_i
         key.key_id = fields[4]
