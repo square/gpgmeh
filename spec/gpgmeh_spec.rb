@@ -83,7 +83,7 @@ RSpec.describe GPGMeh do
       expect(keys[0].key_id).to eq("7A9910E0243D6FEB")
       expect(keys[0].trust).to eq("ultimately")
       expect(keys[0].capabilities).to eq(%w(sign certify encrypt).to_set)
-      expect(keys[0].name).to eq("Rick Hardslab <rick@example.com>")
+      expect(keys[0].name).to eq("Richard Hardslab (The Real Rick) <richard@example.com>")
       expect(keys[0].creation_date).to eq(Date.new(2016, 1, 18))
 
       expect(keys[1].type).to eq("subkey")
