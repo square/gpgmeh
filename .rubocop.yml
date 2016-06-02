@@ -1,85 +1,36 @@
 AllCops:
+  DisplayCopNames: true
   TargetRubyVersion: 2.2
   Exclude:
     - 'bin/*'
     - 'spec/support/**/*'
 
-Metrics/BlockNesting:
-  Max: 3
+ClassLength:
+  Max: 200
 
-Metrics/ClassLength:
+LineLength:
+  Max: 128
+
+MethodLength:
+  Max: 40
+
+Encoding:
   Enabled: false
-
-Metrics/PerceivedComplexity:
-  Enabled: false
-
-Metrics/CyclomaticComplexity:
-  Enabled: false
-
-Metrics/LineLength:
-  AllowURI: true
-  Max: 120
-
-Metrics/MethodLength:
-  Enabled: false
-
-Metrics/ParameterLists:
-  Max: 6
-  CountKeywordArgs: true
 
 Metrics/AbcSize:
-  Enabled: false
+  Max: 70
 
-Style/AlignParameters:
-  EnforcedStyle: with_fixed_indentation
+Metrics/CyclomaticComplexity:
+  Max: 25
 
-Style/ClassAndModuleChildren:
+Metrics/PerceivedComplexity:
+  Max: 25
+
+Metrics/ParameterLists:
   Enabled: false
 
 Style/Documentation:
   Enabled: false
 
-Style/DotPosition:
-  EnforcedStyle: trailing
-
-Style/DoubleNegation:
-  Enabled: false
-
-Style/EachWithObject:
-  Enabled: false
-
-Style/Encoding:
-  Enabled: false
-
-Style/FrozenStringLiteralComment:
-  Enabled: false
-
-Style/GuardClause:
-  Enabled: false
-
-Style/IndentArray:
-  EnforcedStyle: consistent
-
-Style/Lambda:
-  Enabled: false
-
-Style/MultilineOperationIndentation:
-  EnforcedStyle: indented
-
-Style/SignalException:
-  EnforcedStyle: only_raise
-
-Style/SpaceInsideHashLiteralBraces:
-  EnforcedStyle: no_space
-
 Style/StringLiterals:
-  EnforcedStyle: double_quotes
-
-Style/TrailingCommaInLiteral:
-  EnforcedStyleForMultiline: comma
-
-Style/TrailingCommaInArguments:
-  EnforcedStyleForMultiline: comma
-
-Style/TrivialAccessors:
   Enabled: false

@@ -10,7 +10,7 @@ RSpec.describe GPGMeh do
       encrypted_blob = GPGMeh.encrypt("boom", %w(7CAAAB91), sign: true) { |_short_sub_key_id| "test" }
       plaintext = GPGMeh.decrypt(
         encrypted_blob,
-        gpg_options: {homedir: SUPPORT.join("spacemanspiff").to_s},
+        gpg_options: { homedir: SUPPORT.join("spacemanspiff").to_s }
       ) { |_short_sub_key_id| "test" }
       expect(plaintext).to eq("boom")
     end
@@ -20,7 +20,7 @@ RSpec.describe GPGMeh do
 
       plaintext_for_spiff = GPGMeh.decrypt(
         encrypted_blob,
-        gpg_options: {homedir: SUPPORT.join("spacemanspiff").to_s},
+        gpg_options: { homedir: SUPPORT.join("spacemanspiff").to_s }
       ) { |_short_sub_key_id| "test" }
       expect(plaintext_for_spiff).to eq("boom")
 
@@ -34,7 +34,7 @@ RSpec.describe GPGMeh do
 
       plaintext_for_spiff = GPGMeh.decrypt(
         encrypted_blob,
-        gpg_options: {homedir: SUPPORT.join("spacemanspiff").to_s},
+        gpg_options: { homedir: SUPPORT.join("spacemanspiff").to_s }
       ) { |_short_sub_key_id| "test" }
       expect(plaintext_for_spiff.size).to eq(blob.size)
       expect(plaintext_for_spiff).to eq(blob)
@@ -48,7 +48,7 @@ RSpec.describe GPGMeh do
       end
       plaintext = GPGMeh.decrypt(
         encrypted_blob,
-        gpg_options: {homedir: SUPPORT.join("spacemanspiff").to_s},
+        gpg_options: { homedir: SUPPORT.join("spacemanspiff").to_s }
       ) { |_| "secret" }
       expect(plaintext).to eq("boom")
     end
@@ -57,7 +57,7 @@ RSpec.describe GPGMeh do
       encrypted_blob = GPGMeh.encrypt_symmetric("boom", sign: false) { |_| "secret" }
       plaintext = GPGMeh.decrypt(
         encrypted_blob,
-        gpg_options: {homedir: SUPPORT.join("spacemanspiff").to_s},
+        gpg_options: { homedir: SUPPORT.join("spacemanspiff").to_s }
       ) { |_| "secret" }
       expect(plaintext).to eq("boom")
     end
