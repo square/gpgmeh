@@ -21,7 +21,7 @@ class GPGMeh
       "grp" => "reserved for gpgsm",
       "rvk" => "revocation key",
       "tru" => "trust database information",
-      "spk" => "signature subpacket",
+      "spk" => "signature subpacket"
     }.each { |k, v| k.freeze; v.freeze }.freeze # rubocop:disable Style/Semicolon
 
     TYPES_THAT_MATTER = TYPES.values_at(*%w(pub sub sec ssb rvk)).to_set.freeze
@@ -35,7 +35,7 @@ class GPGMeh
       "n" => "none",
       "m" => "marginal",
       "f" => "fully",
-      "u" => "ultimately",
+      "u" => "ultimately"
     }.each { |k, v| k.freeze; v.freeze }.tap do |t| # rubocop:disable Style/Semicolon
       t["-".freeze] = "unknown".freeze
       t["q".freeze] = t["-"]
@@ -46,7 +46,7 @@ class GPGMeh
       "s" => "sign",
       "c" => "certify",
       "a" => "authentication",
-      "d" => "disabled",
+      "d" => "disabled"
     }.each { |k, v| k.freeze; v.freeze }.freeze # rubocop:disable Style/Semicolon
 
     def self.parse(raw_keys)

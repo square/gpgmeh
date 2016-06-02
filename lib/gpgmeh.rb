@@ -100,7 +100,7 @@ class GPGMeh
     new(gpg_options).encrypt_symmetric(
       plaintext,
       sign: sign,
-      passphrase_callback: passphrase_callback || block,
+      passphrase_callback: passphrase_callback || block
     )
   ensure
     logger.debug(format("GPGMeh: symmetric encryption time=%.3fs", Time.now - t)) if t
@@ -181,11 +181,9 @@ class GPGMeh
     wait = @deadline - Time.now
     raise TimeoutError if 0 >= wait || wait_thread.join(wait).nil?
 
-    if wait_thread.value.try(:success?)
-      read_nonblock(stdout, stderr)
-    else
-      raise Error, "gpg non-zero exit status=#{wait_thread.value}"
-    end
+    raise(Error, "gpg non-zero exit status=#{wait_thread.value}") unless wait_thread.value.try(:success?)
+
+    read_nonblock(stdout, stderr)
   rescue => e
     self.class.logger.error("GPGMeh: error=#{e.inspect} backtrace=#{e.backtrace[0..20].inspect}")
     raise
@@ -210,7 +208,7 @@ class GPGMeh
       buffer[0..last].split("\n").each do |line|
         if /NEED_PASSPHRASE (?<sub_key_id>\S+) (?<key_id>\S+)/ =~ line
           self.class.logger.debug(
-            "GPGMeh: NEED_PASSPHRASE sub_key_id=#{sub_key_id.inspect} key_id=#{key_id.inspect}",
+            "GPGMeh: NEED_PASSPHRASE sub_key_id=#{sub_key_id.inspect} key_id=#{key_id.inspect}"
           )
           passphrase = callback.call(sub_key_id[-8..-1])
           raise NoPassphraseError, "secret keyring passphrase required from callback" unless passphrase
@@ -249,7 +247,7 @@ class GPGMeh
 
         if readable == io
           # output_chunk == nil means readable EOF
-          if output_chunk.nil?
+          if output_chunk.nil? # rubocop:disable Style/GuardClause
             return @buffered_output.delete(readable) || ""
           elsif block_given?
             yield output_chunk

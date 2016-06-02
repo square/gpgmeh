@@ -25,7 +25,7 @@ RSpec.describe "GPGMeh stress test:" do
           encrypted_blob = GPGMeh.encrypt("boom", %w(7CAAAB91)) { |_| "test" }
           GPGMeh.decrypt(
             encrypted_blob,
-            gpg_options: {homedir: spiff},
+            gpg_options: { homedir: spiff }
           ) { |_short_sub_key_id| "test" }
         end
       end
