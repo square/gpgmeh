@@ -12,7 +12,7 @@ Gem::Specification.new do |spec|
   spec.summary       = "GPG Made Even (Happier|Hipper|Harder?)"
   spec.homepage      = "https://stash.corp.squareup.com/projects/RUBY/repos/gpgmeh/browse"
 
-  spec.metadata["allowed_push_host"] = "https://square-gems.corp.squareup.com"
+  spec.metadata["allowed_push_host"] = "https://gems.vip.global.square/private/"
 
   spec.files         = `git ls-files -z`.split("\x0").reject { |f| f.match(%r{^(test|spec|features)/}) }
   spec.bindir        = "exe"
@@ -26,5 +26,5 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "rake", "~> 10.0"
   spec.add_development_dependency "rspec", "~> 3.0"
   spec.add_development_dependency "rubocop", "0.36.0"
-  spec.add_development_dependency "sq-gem_tasks"
+  spec.add_development_dependency "sq-gem_tasks", "~> 1.6"
 end
