@@ -34,6 +34,23 @@ GPGMeh.default_args = ["--armor", "--trust-model", "always"]` # --no-tty` and `-
 GPGMeh.timeout_sec = 0.2 # wait up to 200ms for gpg to finish
 ```
 
+### Troubleshooting your Configuration
+
+Make sure `GPGMeh.default_cmd` uses `gpg`, *not* `gpg2`. If you get any of the following errors, check your `gpg` version.
+
+`gpg2` has a slightly different format for `--list-keys --with-colons`:
+
+```
+lib/gpgmeh/key.rb:74:in `rescue in creation_date=': invalid date="1454695279" (GPGMeh::Key::ParseError)
+```
+
+`gpg2` may have trouble starting the agent:
+
+```
+command get_passphrase failed: Inappropriate ioctl for device
+```
+
+
 ### Public Key Encryption: Rick wants to encrypt and sign something for Spiff
 
 ```ruby
