@@ -6,7 +6,7 @@ AllCops:
     - 'spec/support/**/*'
 
 ClassLength:
-  Max: 200
+  Max: 300
 
 LineLength:
   Max: 128
@@ -29,8 +29,14 @@ Metrics/PerceivedComplexity:
 Metrics/ParameterLists:
   Enabled: false
 
+Style/AlignParameters:
+  Enabled: false
+
 Style/Documentation:
   Enabled: false
+
+Style/EmptyLiteral:
+  Enabled: False
 
 Style/StringLiterals:
   Enabled: false
