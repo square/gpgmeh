@@ -1,12 +1,9 @@
 ruby:
-  - 2.2.3
-  - 2.3.0
+  - 2.2.4
+  - 2.3.1
 
 test_command: 'script/ci'
 
 targets:
   - type: spec
-    workers: 1
-  - type: rubocop
-    glob: '**/{*.rb,*.rake,Gemfile,Rakefile}'
     workers: 1
