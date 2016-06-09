@@ -262,7 +262,7 @@ class GPGMeh
       bytes_written = stdin.write_nonblock(input, exception: false)
       break if bytes_written == :wait_writable
 
-      @input = input[bytes_written..-1]
+      @input = input.byteslice(bytes_written..-1)
 
       if input.empty? # rubocop:disable Style/Next
         stdin_monitor.close

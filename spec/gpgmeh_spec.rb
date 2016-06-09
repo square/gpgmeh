@@ -39,6 +39,18 @@ RSpec.describe GPGMeh do
       expect(plaintext_for_spiff.size).to eq(blob.size)
       expect(plaintext_for_spiff).to eq(blob)
     end
+
+    it "works with multibyte characters" do
+      blob = "１２３４５６７👮  💩 "
+      encrypted_blob = GPGMeh.encrypt(blob, %w(7CAAAB91), sign: false)
+
+      plaintext_for_spiff = GPGMeh.decrypt(
+        encrypted_blob,
+        gpg_options: { homedir: SUPPORT.join("spacemanspiff").to_s }
+      ) { |_short_sub_key_id| "test" }.force_encoding(Encoding::UTF_8)
+      expect(plaintext_for_spiff.size).to eq(blob.size)
+      expect(plaintext_for_spiff).to eq(blob)
+    end
   end
 
   describe "symmetric encryption (.encrypt_symmetric, .decrypt)" do
