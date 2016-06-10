@@ -1,6 +1,7 @@
 require "active_support/core_ext/object/blank"
 require "active_support/core_ext/object/try"
 require "logger"
+require "nio"
 require "open3"
 
 class GPGMeh
@@ -118,7 +119,7 @@ class GPGMeh
     new(gpg_options).version
   end
 
-  class <<self
+  class << self
     attr_accessor :default_cmd, :default_args, :default_homedir, :timeout_sec
     attr_writer :logger
   end
@@ -141,123 +142,181 @@ class GPGMeh
     @gpg_args << "--no-tty" unless @gpg_args.include?("--no-tty")
     @gpg_args << "--quiet" unless @gpg_args.include?("--quiet")
     @deadline = Time.now + self.class.timeout_sec
-    @buffered_output = Hash.new { |h, fd| h[fd] = "" }
+    @stdout_buffer = String.new
+    @stderr_buffer = String.new
+    @status_r_buffer = String.new
   end
   private_class_method :new
 
   private
 
-  attr_reader :gpg_cmd, :gpg_args, :status_r, :status_w, :command_r, :command_w, :stdout, :stderr
+  attr_reader :gpg_cmd,
+    :gpg_args,
+    :status_r,
+    :command_w,
+    :stdin,
+    :stdout,
+    :stderr,
+    :stdout_buffer,
+    :stderr_buffer,
+    :status_r_buffer,
+    :stdin_monitor,
+    :stdout_monitor,
+    :stderr_monitor,
+    :status_r_monitor,
+    :input,
+    :callback,
+    :wait_thread
 
-  def start_subprocess(extra_args, input = nil, callback = nil)
-    if callback
-      @status_r, @status_w = IO.pipe
-      status_w.close_on_exec = false
-      @command_r, @command_w = IO.pipe
-      command_r.close_on_exec = false
-      command_w.sync = true
-      extra_args.concat(["--status-fd", status_w.to_i.to_s, "--command-fd", command_r.to_i.to_s])
-    end
+  def start(extra_args, input = nil, callback = nil)
+    setup_gpg_process(extra_args, input, callback)
 
-    stdin, @stdout, @stderr, wait_thread = Open3.popen3(gpg_cmd, *gpg_args, *extra_args, close_others: !callback)
-    stdout.set_encoding(Encoding::BINARY)
+    runloop
 
-    if callback
-      command_r.close
-      status_w.close
-    end
-
-    stdin.write(input) if input
-    stdin.close
-
-    handle_gpg_fd_io(callback) if callback
-
-    warning = read_nonblock(stderr, stdout)
-    if warning.present?
-      self.class.logger.warn("GPGMeh: gpg stderr=#{warning.inspect}")
+    unless stderr_buffer.empty?
+      self.class.logger.warn("GPGMeh: gpg stderr=#{stderr_buffer.inspect}")
     end
 
     # wait on thread completion until the deadline
     wait = @deadline - Time.now
     raise TimeoutError if 0 >= wait || wait_thread.join(wait).nil?
 
-    raise(Error, "gpg non-zero exit status=#{wait_thread.value}") unless wait_thread.value.try(:success?)
+    raise Error, "gpg non-zero exit status=#{wait_thread.value}" unless wait_thread.value.try(:success?)
 
-    read_nonblock(stdout, stderr)
+    stdout_buffer
   rescue => e
-    self.class.logger.error("GPGMeh: error=#{e.inspect} backtrace=#{e.backtrace[0..20].inspect}")
+    self.class.logger.error(
+      "GPGMeh: error=#{e.inspect} backtrace=#{e.backtrace[0..20].inspect} stderr=#{stderr_buffer.inspect}"
+    )
     raise
   ensure
-    # rubocop:disable Style/RescueModifier
-    stdin.close rescue nil
-    stdout.close rescue nil
-    stderr.close rescue nil
-    # rubocop:enable Style/RescueModifier
     begin
       Process.kill(:SIGINT, wait_thread.pid) if wait_thread.alive?
     rescue Errno::ESRCH # rubocop:disable Lint/HandleExceptions
     end
   end
 
-  def handle_gpg_fd_io(callback)
-    buffer = ""
-    read_nonblock(status_r, stdout, stderr) do |status_chunk|
-      buffer += status_chunk
-      last = buffer.rindex("\n")
-
-      buffer[0..last].split("\n").each do |line|
-        if /NEED_PASSPHRASE (?<sub_key_id>\S+) (?<key_id>\S+)/ =~ line
-          self.class.logger.debug(
-            "GPGMeh: NEED_PASSPHRASE sub_key_id=#{sub_key_id.inspect} key_id=#{key_id.inspect}"
-          )
-          passphrase = callback.call(sub_key_id[-8..-1])
-          raise NoPassphraseError, "secret keyring passphrase required from callback" unless passphrase
-          command_w.puts(passphrase)
-        elsif /NEED_PASSPHRASE_SYM/ =~ line
-          self.class.logger.debug("GPGMeh: NEED_PASSPHRASE_SYM")
-          passphrase = callback.call(:symmetric)
-          raise NoPassphraseError, "symmetric passphrase required from callback" unless passphrase
-          command_w.puts(passphrase)
-        end
-      end
-      buffer = buffer[(last + 1)..-1]
+  def setup_gpg_process(extra_args, input, callback)
+    @input = input
+    @callback = callback
+    if callback
+      @status_r, status_w = IO.pipe
+      status_w.close_on_exec = false
+      command_r, @command_w = IO.pipe
+      command_r.close_on_exec = false
+      command_w.sync = true
+      extra_args.concat(["--status-fd", status_w.to_i.to_s, "--command-fd", command_r.to_i.to_s])
     end
-  ensure
-    status_r.close
-    command_w.close
+
+    @stdin, @stdout, @stderr, @wait_thread =
+      Open3.popen3(gpg_cmd, *gpg_args, *extra_args, close_others: !callback)
+    stdout.set_encoding(Encoding::BINARY)
+
+    return unless callback
+
+    command_r.close
+    status_w.close
   end
 
-  # If a block is given, all partial reads of the io will be passed sequentially to the block.
-  # Returns everything read on the stream up until an EOF is read, or throws TimeoutError
-  # if there is no EOF before the deadline.
-  def read_nonblock(io, *other_ios)
-    ios = other_ios << io
+  def runloop
+    selector = NIO::Selector.new
+
+    if input
+      @stdin_monitor = selector.register(stdin, :w)
+      @stdin_monitor.value = method(:write_stdin)
+    end
+    @stdout_monitor = selector.register(stdout, :r)
+    @stdout_monitor.value = method(:read_stdout)
+    @stderr_monitor = selector.register(stderr, :r)
+    @stderr_monitor.value = method(:read_stderr)
+    if callback
+      @status_r_monitor = selector.register(status_r, :r)
+      @status_r_monitor.value = method(:read_status_r)
+    end
+
     loop do
+      break if selector.empty?
+
       wait = @deadline - Time.now
       raise TimeoutError if 0 >= wait
 
-      ready = IO.select(ios, nil, nil, wait)
-      next unless ready
-      readables = ready[0]
-      next unless readables
-
-      readables.each do |readable|
-        output_chunk = readable.read_nonblock(8192, exception: false)
-        next if output_chunk == :wait_readable
-
-        if readable == io
-          # output_chunk == nil means readable EOF
-          if output_chunk.nil? # rubocop:disable Style/GuardClause
-            return @buffered_output.delete(readable) || ""
-          elsif block_given?
-            yield output_chunk
-          end
-        elsif output_chunk.nil?
-          next
-        end
-
-        @buffered_output[readable] += output_chunk
+      ready = selector.select(wait)
+      next unless ready # ready is nil for timeouts
+      ready.each do |monitor|
+        monitor.value.call
       end
+    end
+  ensure
+    # rubocop:disable Style/RescueModifier
+    stdin.close rescue nil
+    stdout.close rescue nil
+    stderr.close rescue nil
+    status_r.close rescue nil
+    command_w.close rescue nil
+    selector.close
+    # rubocop:enable Style/RescueModifier
+  end
+
+  def write_stdin
+    loop do
+      bytes_written = stdin.write_nonblock(input, exception: false)
+      break if bytes_written == :wait_writable
+
+      @input = input.byteslice(bytes_written..-1)
+
+      if input.empty? # rubocop:disable Style/Next
+        stdin_monitor.close
+        stdin.close_write
+        break
+      end
+    end
+  end
+
+  def read_stdout
+    read(stdout, stdout_buffer, stdout_monitor)
+  end
+
+  def read_stderr
+    read(stderr, stderr_buffer, stderr_monitor)
+  end
+
+  def read_status_r
+    read(status_r, status_r_buffer, status_r_monitor)
+
+    last = status_r_buffer.rindex("\n")
+    return unless last
+
+    status_r_buffer[0..last].split("\n").each do |line|
+      if /NEED_PASSPHRASE (?<sub_key_id>\S+) (?<key_id>\S+)/ =~ line
+        self.class.logger.debug(
+          "GPGMeh: NEED_PASSPHRASE sub_key_id=#{sub_key_id.inspect} key_id=#{key_id.inspect}"
+        )
+        passphrase = callback.call(sub_key_id[-8..-1])
+        raise NoPassphraseError, "secret keyring passphrase required from callback" unless passphrase
+        command_w.puts(passphrase)
+      elsif /NEED_PASSPHRASE_SYM/ =~ line
+        self.class.logger.debug("GPGMeh: NEED_PASSPHRASE_SYM")
+        passphrase = callback.call(:symmetric)
+        raise NoPassphraseError, "symmetric passphrase required from callback" unless passphrase
+        command_w.puts(passphrase)
+      end
+    end
+    @status_r_buffer = status_r_buffer[(last + 1)..-1]
+  end
+
+  def read(io, buffer, monitor)
+    loop do
+      output_chunk = io.read_nonblock(8192, exception: false)
+      # output_chunk == nil means readable EOF
+      return if output_chunk == :wait_readable
+
+      if output_chunk.nil?
+        monitor.close
+        io.close
+        return
+      end
+
+      buffer << output_chunk
     end
   end
 
@@ -268,12 +327,12 @@ class GPGMeh
   def encrypt(plaintext, recipients, sign:, passphrase_callback:)
     extra_args = %w(--encrypt) + recipients.flat_map { |recipient| ["--recipient", recipient] }
     extra_args << "--sign" if sign
-    start_subprocess(extra_args, plaintext, passphrase_callback)
+    start(extra_args, plaintext, passphrase_callback)
   end
 
   # @private
   def decrypt(encrypted_blob, passphrase_callback)
-    start_subprocess(["--decrypt"], encrypted_blob, passphrase_callback)
+    start(["--decrypt"], encrypted_blob, passphrase_callback)
   end
 
   # @private
@@ -281,21 +340,21 @@ class GPGMeh
     extra_args = ["--symmetric"]
     extra_args << "--sign" if sign
 
-    start_subprocess(extra_args, plaintext, passphrase_callback)
+    start(extra_args, plaintext, passphrase_callback)
   end
 
   # @private
   def public_keys
-    Key.parse(start_subprocess(%w(--with-colons --list-public-keys)))
+    Key.parse(start(%w(--with-colons --list-public-keys)))
   end
 
   # @private
   def secret_keys
-    Key.parse(start_subprocess(%w(--with-colons --list-secret-keys)))
+    Key.parse(start(%w(--with-colons --list-secret-keys)))
   end
 
   # @private
   def version
-    start_subprocess(%w(--version))
+    start(%w(--version))
   end
 end
