@@ -100,8 +100,26 @@ GPGMeh.encrypt_symmetric("boom") do |key_id|
 end
 ```
 
+### Override default configuration
 
-### GPG setup (this was done to setup the tests, here for posterity)
+```ruby
+# 7CAAAB91 is Spaceman Spiff's public key id; multiple recipients can be specified
+GPGMeh.encrypt(
+  "boom",
+  ["7CAAAB91"],
+  gpg_options: {
+    cmd: "/usr/local/bin/gpg",
+    homedir: "/tmp/.gnupg",
+    timeout_sec: 10
+  }
+) do |key_id|
+  # This is the passphrase callback. The argument is Rick's secret key id.
+  # Return value: the secret keyring passphrase
+  "rick's-secret-keyring-passphrase"
+end
+```
+
+## GPG setup (this was done to setup the tests, here for posterity)
 
 Generate key for Rick Hardslab
 

@@ -6,13 +6,7 @@ RSpec.describe "GPGMeh stress test:" do
   ITERS = 50
 
   around do |example|
-    tmp = GPGMeh.timeout_sec
-    GPGMeh.timeout_sec = 10
-
     time = Benchmark.realtime { example.call }
-
-    GPGMeh.timeout_sec = tmp
-
     description = example.metadata[:description]
     description.replace(format(description, time * 1_000 / THREADS / ITERS, THREADS, ITERS))
   end
@@ -22,10 +16,13 @@ RSpec.describe "GPGMeh stress test:" do
       spiff = SUPPORT.join("spacemanspiff").to_s
       Thread.new do
         ITERS.times do
-          encrypted_blob = GPGMeh.encrypt("boom", %w(7CAAAB91)) { |_| "test" }
+          encrypted_blob = GPGMeh.encrypt(
+            "boom", %w(7CAAAB91), gpg_options: { timeout_sec: 10 }
+          ) { |_| "test" }
+
           GPGMeh.decrypt(
             encrypted_blob,
-            gpg_options: { homedir: spiff }
+            gpg_options: { homedir: spiff, timeout_sec: 10 }
           ) { |_short_sub_key_id| "test" }
         end
       end
