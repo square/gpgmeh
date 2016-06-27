@@ -19,11 +19,12 @@ class GPGMeh
   # @param plaintext [String] bytes to be encrypted with the recipient(s)'
   #   public key; each recipient's secret key must be used to decrypt the message
   # @param recipients [String] or [Array<String>] list of public key id's
-  # @param gpg_options [Hash<Symbol, String>] gpg options, valid keys: cmd, args, homedir
+  # @param gpg_options [Hash<Symbol, String>] gpg options, valid keys: cmd, args, homedir, timeout_sec
   #   cmd: gpg command to execute, default=gpg
   #   args: command line arguments for gpg, default=%w(--armor --trust-model always)
   #     (note: --no-tty and --quiet are always added)
   #   homedir: custom homedir for gpg (passes --homedir argument to gpg)
+  #   timeout_sec: timeout for gpg command, default=0.2
   # @param sign [bool] should the encrypted message be signed? Requires `passphrase_callback`. [default=true]
   # @param passphrase_callback [callable] or [block] callable that returns the secret keyring passphrase,
   #   only required when signing; the callable takes an 8 character string argument (short format key id)
@@ -134,14 +135,15 @@ class GPGMeh
   def initialize(
     cmd: self.class.default_cmd,
     args: self.class.default_args,
-    homedir: self.class.default_homedir
+    homedir: self.class.default_homedir,
+    timeout_sec: self.class.timeout_sec
   )
     @gpg_cmd = cmd.dup
     @gpg_args = args.dup
     @gpg_args.concat(["--homedir", homedir.dup]) if homedir
     @gpg_args << "--no-tty" unless @gpg_args.include?("--no-tty")
     @gpg_args << "--quiet" unless @gpg_args.include?("--quiet")
-    @deadline = Time.now + self.class.timeout_sec
+    @deadline = Time.now + timeout_sec
     @stdout_buffer = String.new
     @stderr_buffer = String.new
     @status_r_buffer = String.new
