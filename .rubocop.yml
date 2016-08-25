@@ -1,0 +1,42 @@
+AllCops:
+  DisplayCopNames: true
+  TargetRubyVersion: 2.2
+  Exclude:
+    - 'bin/*'
+    - 'spec/support/**/*'
+
+ClassLength:
+  Max: 300
+
+LineLength:
+  Max: 128
+
+MethodLength:
+  Max: 40
+
+Encoding:
+  Enabled: false
+
+Metrics/AbcSize:
+  Max: 70
+
+Metrics/CyclomaticComplexity:
+  Max: 25
+
+Metrics/PerceivedComplexity:
+  Max: 25
+
+Metrics/ParameterLists:
+  Enabled: false
+
+Style/AlignParameters:
+  Enabled: false
+
+Style/Documentation:
+  Enabled: false
+
+Style/EmptyLiteral:
+  Enabled: False
+
+Style/StringLiterals:
+  Enabled: false
