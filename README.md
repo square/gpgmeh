@@ -1,5 +1,7 @@
 # GPGMeh: GPG Made Even _HARDER_!
 
+[![Build Status](https://travis-ci.org/square/gpgmeh.svg?branch=master)](https://travis-ci.org/square/gpgmeh)
+
 ## Why?
 
 GPG can be complicated: this gem is just a high level wrapper around `gpg`.
