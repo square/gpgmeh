@@ -17,12 +17,12 @@ RSpec.describe "GPGMeh stress test:" do
       Thread.new do
         ITERS.times do
           encrypted_blob = GPGMeh.encrypt(
-            "boom", %w(7CAAAB91), gpg_options: { timeout_sec: 20 }
+            "boom", %w(7CAAAB91), gpg_options: { timeout_sec: 300 }
           ) { |_| "test" }
 
           GPGMeh.decrypt(
             encrypted_blob,
-            gpg_options: { homedir: spiff, timeout_sec: 20 }
+            gpg_options: { homedir: spiff, timeout_sec: 300 }
           ) { |_short_sub_key_id| "test" }
         end
       end
