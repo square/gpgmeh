@@ -11,6 +11,7 @@ RSpec.configure do |config|
     GPGMeh.logger = Logger.new("/dev/null")
     GPGMeh.default_cmd = ENV["GPG"] if ENV.key?("GPG")
     GPGMeh.default_homedir = SUPPORT.join("rickhardslab").to_s
+    GPGMeh.timeout_sec = 1
     unless SUPPORT.join("rickhardslab", "random_seed").exist?
       FileUtils.cp(SUPPORT.join("random_seed.1"), SUPPORT.join("rickhardslab", "random_seed"))
     end
