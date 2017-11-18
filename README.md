@@ -144,7 +144,7 @@ gpg --homedir spec/support/spacemanspiff --gen-key
 Rick Hardslab imports Spaceman Spiff's public key
 
 ```
-gpg --homedir rickhardslab --import spacemanspiff/pubring.gpg
+gpg --homedir spec/support/rickhardslab --import spacemanspiff/pubring.gpg
 ```
 
 Rick Hardslab trusts Spaceman Spiff's public key
@@ -156,7 +156,7 @@ gpg --homedir spec/support/spacemanspiff --export-ownertrust | gpg --homedir spe
 Spaceman Spiff imports Rick Hardslab's public key
 
 ```
-gpg --homedir spacemanspiff --import rickhardslab/pubring.gpg
+gpg --homedir spec/support/spacemanspiff --import rickhardslab/pubring.gpg
 ```
 
 Spaceman Spiff trusts Rick Hardslab's public key
@@ -175,7 +175,7 @@ gpg --homedir spec/support/rickhardslab/ --edit-key 7A9910E0243D6FEB
 Rick Hardslab's keys
 
 ```
-% gpg --homedir rickhardslab -k
+% gpg --homedir spec/support/rickhardslab/ -k
 rickhardslab/pubring.gpg
 ------------------------
 pub   2048R/243D6FEB 2016-01-18
@@ -187,7 +187,7 @@ pub   2048R/7CAAAB91 2016-01-18
 uid                  Spaceman Spiff <spiff@example.com>
 sub   2048R/11AB415A 2016-01-18
 
-% gpg --homedir rickhardslab -K
+% gpg --homedir spec/support/rickhardslab -K
 rickhardslab/secring.gpg
 ------------------------
 sec   2048R/243D6FEB 2016-01-18
@@ -199,14 +199,14 @@ ssb   2048R/7FCAE6B3 2016-01-18
 Spaceman Spiff's keys
 
 ```
-% gpg --homedir spacemanspiff -K
+% gpg --homedir spec/support/spacemanspiff -K
 spacemanspiff/secring.gpg
 -------------------------
 sec   2048R/7CAAAB91 2016-01-18
 uid                  Spaceman Spiff <spiff@example.com>
 ssb   2048R/11AB415A 2016-01-18
 
-% gpg --homedir spacemanspiff -k
+% gpg --homedir spec/support/spacemanspiff -k
 spacemanspiff/pubring.gpg
 -------------------------
 pub   2048R/7CAAAB91 2016-01-18
