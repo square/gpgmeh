@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require "active_support/core_ext/object/blank"
 require "active_support/core_ext/object/try"
 require "nio"
@@ -125,7 +126,7 @@ class GPGMeh
     attr_writer :logger
   end
   self.default_cmd = "gpg"
-  self.default_args = %w(--armor --trust-model always).freeze
+  self.default_args = %w[--armor --trust-model always].freeze
   self.timeout_sec = 0.2
 
   def self.logger
@@ -146,9 +147,9 @@ class GPGMeh
     @gpg_args << "--no-tty" unless @gpg_args.include?("--no-tty")
     @gpg_args << "--quiet" unless @gpg_args.include?("--quiet")
     @deadline = Time.now + timeout_sec
-    @stdout_buffer = String.new
-    @stderr_buffer = String.new
-    @status_r_buffer = String.new
+    @stdout_buffer = +""
+    @stderr_buffer = +""
+    @status_r_buffer = +""
   end
   private_class_method :new
 
@@ -183,7 +184,7 @@ class GPGMeh
 
     # wait on thread completion until the deadline
     wait = @deadline - Time.now
-    raise TimeoutError if 0 >= wait || wait_thread.join(wait).nil?
+    raise TimeoutError if wait <= 0 || wait_thread.join(wait).nil?
 
     raise Error, "gpg non-zero exit status=#{wait_thread.value}" unless wait_thread.value.try(:success?)
 
@@ -242,7 +243,7 @@ class GPGMeh
       break if selector.empty?
 
       wait = @deadline - Time.now
-      raise TimeoutError if 0 >= wait
+      raise TimeoutError if wait <= 0
 
       ready = selector.select(wait)
       next unless ready # ready is nil for timeouts
@@ -301,7 +302,7 @@ class GPGMeh
         passphrase = callback.call(sub_key_id[-8..-1])
         raise NoPassphraseError, "secret keyring passphrase required from callback" unless passphrase
         command_w.puts(passphrase)
-      elsif /NEED_PASSPHRASE_SYM/ =~ line
+      elsif /NEED_PASSPHRASE_SYM/.match?(line)
         self.class.logger.debug("GPGMeh: NEED_PASSPHRASE_SYM")
         passphrase = callback.call(:symmetric)
         raise NoPassphraseError, "symmetric passphrase required from callback" unless passphrase
@@ -332,7 +333,7 @@ class GPGMeh
 
   # @private
   def encrypt(plaintext, recipients, sign:, passphrase_callback:)
-    extra_args = %w(--encrypt) + recipients.flat_map { |recipient| ["--recipient", recipient] }
+    extra_args = %w[--encrypt] + recipients.flat_map { |recipient| ["--recipient", recipient] }
     extra_args << "--sign" if sign
     start(extra_args, plaintext, passphrase_callback)
   end
@@ -352,16 +353,16 @@ class GPGMeh
 
   # @private
   def public_keys
-    Key.parse(start(%w(--with-colons --list-public-keys)))
+    Key.parse(start(%w[--with-colons --list-public-keys]))
   end
 
   # @private
   def secret_keys
-    Key.parse(start(%w(--with-colons --list-secret-keys)))
+    Key.parse(start(%w[--with-colons --list-secret-keys]))
   end
 
   # @private
   def version
-    start(%w(--version))
+    start(%w[--version])
   end
 end

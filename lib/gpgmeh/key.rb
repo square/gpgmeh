@@ -27,7 +27,7 @@ class GPGMeh
       "spk" => "signature subpacket"
     }.freeze
 
-    TYPES_THAT_MATTER = TYPES.values_at(*%w(pub sub sec ssb rvk)).to_set.freeze
+    TYPES_THAT_MATTER = TYPES.values_at('pub', 'sub', 'sec', 'ssb', 'rvk').to_set.freeze
 
     TRUSTS = {
       "o" => "other",

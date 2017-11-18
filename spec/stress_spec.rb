@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "spec_helper"
 require "benchmark"
 
@@ -11,13 +13,13 @@ RSpec.describe "GPGMeh stress test:" do
     description.replace(format(description, time * 1_000 / THREADS / ITERS, THREADS, ITERS))
   end
 
-  it "%.1f ms / roundtip encrypt, decrypt iteration (threads=%d, iters=%d)" do
+  it(+"%.1f ms / roundtip encrypt, decrypt iteration (threads=%d, iters=%d)") do
     threads = Array.new(THREADS) do
       spiff = SUPPORT.join("spacemanspiff").to_s
       Thread.new do
         ITERS.times do
           encrypted_blob = GPGMeh.encrypt(
-            "boom", %w(7CAAAB91), gpg_options: { timeout_sec: 300 }
+            "boom", %w[7CAAAB91], gpg_options: { timeout_sec: 300 }
           ) { |_| "test" }
 
           GPGMeh.decrypt(
