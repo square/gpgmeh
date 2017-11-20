@@ -1,4 +1,6 @@
 # frozen_string_literal: true
+
+require "date"
 require "set"
 
 class GPGMeh
@@ -25,7 +27,7 @@ class GPGMeh
       "spk" => "signature subpacket"
     }.freeze
 
-    TYPES_THAT_MATTER = TYPES.values_at(*%w(pub sub sec ssb rvk)).to_set.freeze
+    TYPES_THAT_MATTER = TYPES.values_at('pub', 'sub', 'sec', 'ssb', 'rvk').to_set.freeze
 
     TRUSTS = {
       "o" => "other",
@@ -71,7 +73,9 @@ class GPGMeh
     def creation_date=(s)
       @creation_date = Date.parse(s)
     rescue ArgumentError => e
-      raise ParseError, "#{e.message}=#{s.inspect}"
+      msg = "#{e.message}=#{s.inspect}"
+      msg += ", gpg2 uses a different date format, are you using gpg2 instead of gpg1?" if s.to_i.to_s == s
+      raise ParseError, msg
     end
 
     def type=(s)

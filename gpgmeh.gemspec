@@ -1,4 +1,6 @@
 # coding: utf-8
+# frozen_string_literal: true
+
 lib = File.expand_path("../lib", __FILE__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 require "gpgmeh/version"
@@ -18,11 +20,5 @@ Gem::Specification.new do |spec|
   spec.require_paths = ["lib"]
 
   spec.add_dependency "activesupport", ">= 2.3"
-  spec.add_dependency "nio4r", "~> 1.2.1"
-
-  spec.add_development_dependency "bundler", "~> 1.11"
-  spec.add_development_dependency "pry"
-  spec.add_development_dependency "rake", "~> 10.0"
-  spec.add_development_dependency "rspec", "~> 3.0"
-  spec.add_development_dependency "rubocop", "0.40.0"
+  spec.add_dependency "nio4r", "~> 2"
 end

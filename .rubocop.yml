@@ -1,6 +1,6 @@
 AllCops:
   DisplayCopNames: true
-  TargetRubyVersion: 2.2
+  TargetRubyVersion: 2.4
   Exclude:
     - 'bin/*'
     - 'spec/support/**/*'
@@ -17,8 +17,14 @@ MethodLength:
 Encoding:
   Enabled: false
 
+Lint/RescueWithoutErrorClass:
+  Enabled: false
+
 Metrics/AbcSize:
   Max: 70
+
+Metrics/BlockLength:
+  Enabled: false
 
 Metrics/CyclomaticComplexity:
   Max: 25
