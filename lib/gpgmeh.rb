@@ -132,7 +132,7 @@ class GPGMeh
   def self.logger
     return @logger if defined?(@logger)
     require "logger"
-    @logger = Logger.new(STDOUT)
+    @logger = Logger.new(STDERR)
   end
 
   def initialize(
@@ -141,11 +141,9 @@ class GPGMeh
     homedir: self.class.default_homedir,
     timeout_sec: self.class.timeout_sec
   )
-    @gpg_cmd = cmd.dup
-    @gpg_args = args.dup
-    @gpg_args.concat(["--homedir", homedir.dup]) if homedir
-    @gpg_args << "--no-tty" unless @gpg_args.include?("--no-tty")
-    @gpg_args << "--quiet" unless @gpg_args.include?("--quiet")
+    @gpg_cmd = cmd
+    @gpg_args = args
+    @gpg_args += ["--homedir", homedir] if homedir
     @deadline = Time.now + timeout_sec
     @stdout_buffer = +""
     @stderr_buffer = +""
@@ -179,7 +177,7 @@ class GPGMeh
     runloop
 
     unless stderr_buffer.empty?
-      self.class.logger.warn("GPGMeh: gpg stderr=#{stderr_buffer.inspect}")
+      self.class.logger.warn { "GPGMeh: gpg stderr=#{stderr_buffer.inspect}" }
     end
 
     # wait on thread completion until the deadline
@@ -190,9 +188,9 @@ class GPGMeh
 
     stdout_buffer
   rescue => e
-    self.class.logger.error(
+    self.class.logger.error do
       "GPGMeh: error=#{e.inspect} backtrace=#{e.backtrace[0..20].inspect} stderr=#{stderr_buffer.inspect}"
-    )
+    end
     raise
   ensure
     begin
@@ -214,7 +212,7 @@ class GPGMeh
     end
 
     @stdin, @stdout, @stderr, @wait_thread =
-      Open3.popen3(gpg_cmd, *gpg_args, *extra_args, close_others: !callback)
+      Open3.popen3(gpg_cmd, "--no-tty", "--quiet", *gpg_args, *extra_args, close_others: !callback)
     stdout.set_encoding(Encoding::BINARY)
 
     return unless callback
@@ -293,12 +291,12 @@ class GPGMeh
 
     status_r_buffer[0..last].split("\n").each do |line|
       # See README.md for link to gpg documentation on status-fd output
-      self.class.logger.debug("GPGMeh: gpg status-fd output=#{line.inspect}")
+      self.class.logger.debug { "GPGMeh: gpg status-fd output=#{line.inspect}" }
 
       if /NEED_PASSPHRASE (?<sub_key_id>\S+) (?<key_id>\S+)/ =~ line
-        self.class.logger.debug(
+        self.class.logger.debug do
           "GPGMeh: NEED_PASSPHRASE sub_key_id=#{sub_key_id.inspect} key_id=#{key_id.inspect}"
-        )
+        end
         passphrase = callback.call(sub_key_id[-8..-1])
         raise NoPassphraseError, "secret keyring passphrase required from callback" unless passphrase
         command_w.puts(passphrase)

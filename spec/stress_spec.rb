@@ -3,7 +3,7 @@
 require "spec_helper"
 require "benchmark"
 
-RSpec.describe "GPGMeh stress test:" do
+RSpec.describe "GPGMeh stress test:", stress: true do
   THREADS = 100
   ITERS = 50
 
