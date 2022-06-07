@@ -49,7 +49,7 @@ class GPGMeh
       raise ArgumentError, "recipient key ids must all be alphanumeric strings"
     end
     t = Time.now
-    new(gpg_options).encrypt(plaintext, recipients, sign: sign, passphrase_callback: passphrase_callback || block)
+    new(**gpg_options).encrypt(plaintext, recipients, sign: sign, passphrase_callback: passphrase_callback || block)
   ensure
     logger.debug(format("GPGMeh: encryption time=%.3fs", Time.now - t)) if t
   end
@@ -64,7 +64,7 @@ class GPGMeh
   def self.decrypt(encrypted_blob, gpg_options: {}, passphrase_callback: nil, &block)
     raise ArgumentError, "passphrase callback required" if (passphrase_callback || block).nil?
     t = Time.now
-    new(gpg_options).decrypt(encrypted_blob, passphrase_callback || block)
+    new(**gpg_options).decrypt(encrypted_blob, passphrase_callback || block)
   ensure
     logger.debug(format("GPGMeh: decryption time=%.3fs", Time.now - t)) if t
   end
@@ -100,7 +100,7 @@ class GPGMeh
     &block
   )
     t = Time.now
-    new(gpg_options).encrypt_symmetric(
+    new(**gpg_options).encrypt_symmetric(
       plaintext,
       sign: sign,
       passphrase_callback: passphrase_callback || block
@@ -110,15 +110,15 @@ class GPGMeh
   end
 
   def self.public_keys(gpg_options: {})
-    new(gpg_options).public_keys
+    new(**gpg_options).public_keys
   end
 
   def self.secret_keys(gpg_options: {})
-    new(gpg_options).secret_keys
+    new(**gpg_options).secret_keys
   end
 
   def self.version(gpg_options: {})
-    new(gpg_options).version
+    new(**gpg_options).version
   end
 
   class << self
